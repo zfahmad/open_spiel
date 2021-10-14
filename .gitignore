@@ -58,3 +58,5 @@ open_spiel/cmake-build-debug/
 Package.resolved
 
 **/*.pt
+**/*.swp
+
