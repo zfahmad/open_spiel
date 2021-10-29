@@ -5,6 +5,7 @@
 #include "open_spiel/algorithms/alpha_zero_torch/uct.h"
 #include "open_spiel/algorithms/alpha_zero_torch/puct.h"
 #include "open_spiel/algorithms/alpha_zero_torch/lts.h"
+#include "open_spiel/algorithms/alpha_zero_torch/bf_lts.h"
 
 namespace open_spiel {
 namespace algorithms {
@@ -41,7 +42,7 @@ int playGame(std::shared_ptr<const Game> &game) {
 
     // UCTNode *selection = mcts.select_lcb(root_node.children, 512);
     // printNode(*selection);
-    mcts.search(state, 1, false, "test_file.txt");
+//    mcts.search(state, 1, true, "test_file.txt");
 
     std::string graph_def = "vnet.pb";
     std::string path = "/Users/zaheen/projects/open_spiel/open_spiel/algorithms/alpha_zero_torch/";
@@ -50,11 +51,11 @@ int playGame(std::shared_ptr<const Game> &game) {
     open_spiel::algorithms::torch_az::VPNetModel *model = new open_spiel::algorithms::torch_az::VPNetModel(*game, 
             path, graph_def, "cpu:0");
     model->LoadCheckpoint(path.append("checkpoint-1500"));
-    PUCT pmcts = PUCT(0.98, 128, *model);
-    PUCTNode puct_node;
-    puct_node.visit_count = 0;
-    puct_node.cum_value = 0;
-    std::vector<PUCTNode>::iterator pchild;
+//    PUCT pmcts = PUCT(0.98, 128, *model);
+//    PUCTNode puct_node;
+//    puct_node.visit_count = 0;
+//    puct_node.cum_value = 0;
+//    std::vector<PUCTNode>::iterator pchild;
 
     // for (int i = 0; i < 128; i++) {
     //     root = state->Clone();
@@ -65,9 +66,9 @@ int playGame(std::shared_ptr<const Game> &game) {
     //     printNode(*pchild);
     // }
 
-    pmcts.search(state, 0, false, "test_file.txt");
+//    pmcts.search(state, 0, false, "test_file.txt");
     
-    LTS lts_search = LTS(128, *model);
+    LTS lts_search = LTS(16, *model);
 
     // LTSNode lnode;
     // lnode.depth = 1;
@@ -80,7 +81,9 @@ int playGame(std::shared_ptr<const Game> &game) {
     // for (auto lchild = lnode.children.begin(); lchild < lnode.children.end(); lchild++) {
     //     printNode(*lchild);
     // }
-    lts_search.search(state, 0, false, "test_file.txt");
+    lts_search.search(state, 0, true, "");
+    BFLTS bflts = BFLTS(game, 15, *model);
+    bflts.search(state, 0, true, "");
 
     return 0;
 }

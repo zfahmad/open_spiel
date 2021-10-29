@@ -4,10 +4,10 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <queue>
+#include "open_spiel/algorithms/alpha_zero_torch/vpnet.h"
 
-namespace open_spiel {
-namespace algorithms {
-namespace torch_az {
+namespace open_spiel::algorithms::torch_az {
 
 struct BFSNode {
     Action action;
@@ -19,30 +19,32 @@ struct BFSNode {
     float cost;
     float pred_val;
     float minimax_val;
-    std::vector<BFSNode> children;
+    bool terminal;
+    std::vector<BFSNode*> children;
 };
 
-class BFSQueue {
-    struct QNode {
-        BFSNode *item;
-        BFSNode *next;
-        BFSNode *prev;
-    }
-    private:
-        int size;
-        int capacity;
-        QNode *head;
-    public:
-        BFSQueue(capacity)
-            : size(0), capacity(capacity) {}
-        void enqueue(BFSNode new_node);
-        BFSNode * pull();
-        void pop();
-        void printQueue();
-}
+void printNode(const BFSNode &node);
+void writeNode(const BFSNode &node, int turn_number, float duration, std::string file_name);
 
-}
-}
+class BFLTS {
+private:
+    int budget;
+    VPNetModel &model;
+    std::shared_ptr<const Game> &game;
+public:
+    BFLTS(std::shared_ptr<const Game> &game, int budget, VPNetModel &model)
+        : game(game), budget(budget), model(model) {}
+    std::priority_queue<BFSNode, std::vector<BFSNode>, std::greater<>> pq;
+    void generate_children(std::unique_ptr<open_spiel::State> &root, BFSNode &root_node);
+    void search(std::unique_ptr<open_spiel::State> &state, int turn_number, bool verbose, std::string output_file);
+    BFSNode * build_tree(std::unique_ptr<open_spiel::State> &state);
+    float minimax(BFSNode &root_node);
+};
+
+bool operator< (const BFSNode &node_1, const BFSNode &node_2);
+
+bool operator> (const BFSNode &node_1, const BFSNode &node_2);
+
 }
 
 #endif

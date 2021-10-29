@@ -83,10 +83,6 @@ float LTS::traverse(std::unique_ptr<open_spiel::State> &root, LTSNode &root_node
     float child_val;
     std::unique_ptr<open_spiel::State> next_state;
     // std::cout << root << std::endl;
-    if (search_count >= budget) {
-        terminate = true;
-        return root_node.minimax_val;
-    }
 
     if (root->IsTerminal()) {
         // std::cout << "Terminal" << std::endl;
@@ -98,11 +94,15 @@ float LTS::traverse(std::unique_ptr<open_spiel::State> &root, LTSNode &root_node
         }
         // std::cout << "Returning" << std::endl;
     } else {
-        if (root_node.visited == false) {
+        if (!root_node.visited) {
             // std::cout << "Is terminal: " << root->IsTerminal() << std::endl;
             root_node.children = expand(root, root_node);
             search_count++;
             root_node.visited = true;
+            if (search_count > budget) {
+                terminate = true;
+                return root_node.minimax_val;
+            }
         }
 
         bool has_children = false;
@@ -227,6 +227,7 @@ Action LTS::search(std::unique_ptr<open_spiel::State> &state, int turn_number, b
     root_node.visited = false;
     root_node.terminal = false;
     std::unique_ptr<open_spiel::State> root;
+    std::vector<LTSNode> current_candidates;
     current_bound = 0.0;
     // current_bound = std::numeric_limits<float>::infinity();
     next_bound = std::numeric_limits<float>::infinity();
@@ -234,17 +235,21 @@ Action LTS::search(std::unique_ptr<open_spiel::State> &state, int turn_number, b
     float bound, value;
 
     search_count = 0;
-    // for (int i = 0; i < 16; i++) {
-    while (next_bound != current_bound && terminate == false) {
+//     for (int i = 0; i < 4; i++) {
+    while (next_bound != current_bound && !terminate) {
         root = state->Clone();
-        build(root, root_node);
+//        build(root, root_node);
+        value = traverse(root, root_node);
         if (verbose) {
             std::cout << "Current Bound: " << current_bound << " "
                       << "Next Bound: " << next_bound << " " 
                       << "Num Leaves: " << search_count << std::endl;
         }
-        if (!terminate)
+        if (!terminate) {
             bound = current_bound;
+            current_candidates = root_node.children;
+        }
+
         current_bound += log(sqrt(2));
         if (next_bound > current_bound)
             current_bound = next_bound;
@@ -254,19 +259,19 @@ Action LTS::search(std::unique_ptr<open_spiel::State> &state, int turn_number, b
         // }
     }
 
-    if (verbose)
-        std::cout << "Running minimax on LTS tree with bound: " << bound << std::endl;
-    root = state->Clone();
-    value = minimax(root_node, bound);
+//    if (verbose)
+//        std::cout << "Running minimax on LTS tree with bound: " << bound << std::endl;
+//    root = state->Clone();
+//    value = minimax(root_node, bound);
     auto stop = high_resolution_clock::now();
     if (verbose) {
         std::cout << "Finished search over with minimax value: " << -value << std::endl;
-        for (auto child = root_node.children.begin(); child < root_node.children.end(); child++) {
+        for (auto child = current_candidates.begin(); child < current_candidates.end(); child++) {
             printNode((*child));
         }
     }
 
-    LTSNode *selection = select_best(root_node.children);
+    LTSNode *selection = select_best(current_candidates);
 
     auto duration = duration_cast<seconds>(stop - start);
     writeNode(root_node, turn_number, duration.count(), output_file);

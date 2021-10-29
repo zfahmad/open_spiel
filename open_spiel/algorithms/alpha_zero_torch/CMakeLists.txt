@@ -22,6 +22,7 @@ if (OPEN_SPIEL_BUILD_WITH_LIBTORCH)
     lts.h
     lts.cc
     bf_lts.h
+    bf_lts.cc
   )
   target_include_directories (alpha_zero_torch PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
