@@ -273,7 +273,7 @@ Action LTS::search(std::unique_ptr<open_spiel::State> &state, int turn_number, b
 
     LTSNode *selection = select_best(current_candidates);
 
-    auto duration = duration_cast<seconds>(stop - start);
+    auto duration = duration_cast<milliseconds>(stop - start);
     writeNode(root_node, turn_number, duration.count(), output_file);
 
     return (*selection).action;

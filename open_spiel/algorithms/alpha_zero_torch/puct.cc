@@ -176,7 +176,7 @@ Action PUCT::search(std::unique_ptr<open_spiel::State> &state, int turn_number, 
 
     PUCTNode *selection = select_node(root_node.children);
     auto stop = high_resolution_clock::now();
-    auto duration = duration_cast<seconds>(stop - start);
+    auto duration = duration_cast<milliseconds>(stop - start);
 
     if (verbose) {
         printNode(*selection);

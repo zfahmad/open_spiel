@@ -36,7 +36,8 @@ public:
         : game(game), budget(budget), model(model) {}
     std::priority_queue<BFSNode, std::vector<BFSNode>, std::greater<>> pq;
     void generate_children(std::unique_ptr<open_spiel::State> &root, BFSNode &root_node);
-    void search(std::unique_ptr<open_spiel::State> &state, int turn_number, bool verbose, std::string output_file);
+    Action search(std::unique_ptr<open_spiel::State> &state, int turn_number, bool verbose, std::string output_file);
+    BFSNode * select_best(std::vector<BFSNode *> &children);
     BFSNode * build_tree(std::unique_ptr<open_spiel::State> &state);
     float minimax(BFSNode &root_node);
 };

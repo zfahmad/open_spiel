@@ -1,7 +1,9 @@
 #include <iostream>
 #include <vector>
+#include <chrono>
 #include "open_spiel/algorithms/alpha_zero_torch/bf_lts.h"
 
+using namespace std::chrono;
 namespace open_spiel::algorithms::torch_az {
 
 void printNode(const BFSNode &node) {
@@ -12,6 +14,27 @@ void printNode(const BFSNode &node) {
               << "Actor RP: " << node.actor_rp << std::endl
               << "Eventual RP: " << node.eventual_rp << std::endl
               << "Cost: " << node.cost << "\n" << std::endl;
+}
+
+void writeNode(const BFSNode &node, int turn_number, float duration, std::string file_name="") {
+    std::ofstream os_stream;
+    os_stream.open(file_name, std::ios::app);
+
+    os_stream << "BFS at turn: " << turn_number << "\n" << std::endl;
+    os_stream << "Player: " << turn_number % 2 << std::endl;
+    os_stream << "Elapsed time: " << duration << "\n" << std::endl;
+    for (auto child = node.children.begin(); child < node.children.end(); child++) {
+        os_stream << "Action: " << (*child)->action << std::endl
+                  << "Depth: " << (*child)->depth << std::endl
+                  << "Minimax Value: " << (*child)->minimax_val << std::endl
+                  << "Predicted Value: " << (*child)->pred_val << std::endl
+                  << "Actor RP: " << (*child)->actor_rp << std::endl
+                  << "Eventual RP: " << (*child)->eventual_rp << std::endl
+                  << "Cost: " << (*child)->cost << std::endl
+                  << "Terminal: " << (*child)->terminal << "\n" << std::endl;
+    }
+    os_stream << "=====================================\n\n" << std::endl;
+    os_stream.close();
 }
 
 bool operator< (const BFSNode &node_1, const BFSNode &node_2) {
@@ -56,7 +79,30 @@ void BFLTS::generate_children(std::unique_ptr<open_spiel::State> &root, BFSNode 
     }
 }
 
-void BFLTS::search(std::unique_ptr<open_spiel::State> &state, int turn_number, bool verbose, std::string output_file) {
+BFSNode * BFLTS::select_best(std::vector<BFSNode *> &children) {
+    std::vector<BFSNode *> best_children, best_child;
+    std::vector<BFSNode *>::iterator child;
+    float max_val = -std::numeric_limits<float>::infinity();
+
+    for (child = children.begin(); child < children.end(); child++) {
+        if ((*child)->minimax_val > max_val) {
+            best_children.clear();
+            best_children.push_back((*child));
+            max_val = (*child)->minimax_val;
+        } else if ((*child)->minimax_val == max_val) {
+            best_children.push_back((*child));
+        }
+    }
+
+    std::sample(best_children.begin(), best_children.end(),
+                std::back_inserter(best_child), 1,
+                std::mt19937{std::random_device{}()});
+
+    return best_child.front();
+}
+
+Action BFLTS::search(std::unique_ptr<open_spiel::State> &state, int turn_number, bool verbose, std::string output_file) {
+    auto start = high_resolution_clock::now();
     float value;
     BFSNode *tree;
     tree = build_tree(state);
@@ -68,11 +114,11 @@ void BFLTS::search(std::unique_ptr<open_spiel::State> &state, int turn_number, b
             printNode((**child));
         }
     }
-//    std::cout << "In queue: " << std::endl;
-//    while (!pq.empty()) {
-//        printNode(pq.top());
-//        pq.pop();
-//    }
+    auto stop = high_resolution_clock::now();
+    BFSNode *selection = select_best(tree->children);
+    auto duration = duration_cast<milliseconds>(stop - start);
+    writeNode(*tree, turn_number, duration.count(), output_file);
+    return selection->action;
 }
 
 BFSNode * BFLTS::build_tree(std::unique_ptr<open_spiel::State> &state) {
