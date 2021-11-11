@@ -10,9 +10,7 @@ using namespace std::chrono;
 
 #include "open_spiel/algorithms/alpha_zero_torch/uct.h"
 
-namespace open_spiel {
-namespace algorithms {
-namespace torch_az {
+namespace open_spiel::algorithms::torch_az {
 
 // UCT::UCT(float c, int b) {
 //     uct_c = c;
@@ -34,35 +32,35 @@ void writeNode(const UCTNode &node, int turn_number, float duration, std::string
     os_stream << "Player: " << turn_number % 2 << std::endl;
     os_stream << "Elapsed time: " << duration << "\n" << std::endl;
     for (auto child = node.children.begin(); child < node.children.end(); child++) {
-        os_stream << "Action: " << (*child).action << std::endl
-                  << "Exp. Value: " << ((*child).cum_value / (*child).visit_count) << std::endl
-                  << "Cum. Value: " << (*child).cum_value << std::endl
-                  << "UCB Value: " << (*child).ucb_value << std::endl
-                  << "Visits: " << (*child).visit_count << "\n" << std::endl;
+        os_stream << "Action: " << (*child)->action << std::endl
+                  << "Exp. Value: " << ((*child)->cum_value / (*child)->visit_count) << std::endl
+                  << "Cum. Value: " << (*child)->cum_value << std::endl
+                  << "UCB Value: " << (*child)->ucb_value << std::endl
+                  << "Visits: " << (*child)->visit_count << "\n" << std::endl;
     }
     os_stream << "=====================================\n\n" << std::endl;
     os_stream.close();
 }
 
-UCTNode * UCT::sample_ucb(std::vector<UCTNode> &children, int N) {
+UCTNode * UCT::sample_ucb(std::vector<UCTNode *> &children, int N) {
     std::vector<UCTNode *> best_children, best_child;
-    std::vector<UCTNode>::iterator child;
+    std::vector<UCTNode *>::iterator child;
     float max_value = -std::numeric_limits<float>::infinity();
 
     for (child = children.begin(); child < children.end(); child++) {
-        if ((*child).visit_count == 0.0) {
-            (*child).ucb_value = std::numeric_limits<float>::infinity();
+        if ((*child)->visit_count == 0.0) {
+            (*child)->ucb_value = std::numeric_limits<float>::infinity();
         } else {
-            (*child).ucb_value = (*child).cum_value / (*child).visit_count
-                + uct_c * sqrt(2 * log(N) / (*child).visit_count);
+            (*child)->ucb_value = (*child)->cum_value / (*child)->visit_count
+                + uct_c * sqrt(2 * log(N) / (*child)->visit_count);
         }
 
-        if ((*child).ucb_value > max_value) {
+        if ((*child)->ucb_value > max_value) {
             best_children.clear();
-            best_children.push_back(&(*child));
-            max_value = (*child).ucb_value;
-        } else if ((*child).ucb_value == max_value) {
-            best_children.push_back(&(*child));
+            best_children.push_back((*child));
+            max_value = (*child)->ucb_value;
+        } else if ((*child)->ucb_value == max_value) {
+            best_children.push_back((*child));
         }
     }
 
@@ -112,12 +110,12 @@ float UCT::traverse(std::unique_ptr<open_spiel::State> &root, UCTNode &root_node
     return 0.0;
 }
 
-std::vector<UCTNode> UCT::expand(std::unique_ptr<open_spiel::State> &root) {
+std::vector<UCTNode *> UCT::expand(std::unique_ptr<open_spiel::State> &root) {
      // std::cout << root << std::endl;
      std::vector<Action> actions;
      actions = root->LegalActions();
      std::vector<Action>::iterator action;
-     std::vector<UCTNode> children;
+     std::vector<UCTNode *> children;
 
      // std::cout << actions << std::endl;
 
@@ -126,7 +124,7 @@ std::vector<UCTNode> UCT::expand(std::unique_ptr<open_spiel::State> &root) {
          child->action = *action;
          child->visit_count = 0.0;
          child->cum_value = 0.0;
-         children.push_back(*child);
+         children.push_back(child);
      }
 
      return children;
@@ -156,21 +154,21 @@ float UCT::rollout(std::unique_ptr<open_spiel::State> &root) {
     }
 }
 
-UCTNode * UCT::select_lcb(std::vector<UCTNode> &children, int N) {
+UCTNode * UCT::select_lcb(std::vector<UCTNode *> &children, int N) {
     std::vector<UCTNode *> best_children, best_child;
-    std::vector<UCTNode>::iterator child;
+    std::vector<UCTNode *>::iterator child;
     float child_lcb, max_lcb = -std::numeric_limits<float>::infinity();
 
     for (child = children.begin(); child < children.end(); child++) {
-        child_lcb = (*child).cum_value / (*child).visit_count
-            - sqrt(2 * log(N) / (*child).visit_count);
+        child_lcb = (*child)->cum_value / (*child)->visit_count
+            - sqrt(2 * log(N) / (*child)->visit_count);
 
         if (child_lcb > max_lcb) {
             best_children.clear();
-            best_children.push_back(&(*child));
+            best_children.push_back((*child));
             max_lcb = child_lcb;
         } else if (child_lcb == max_lcb) {
-            best_children.push_back(&(*child));
+            best_children.push_back((*child));
         }
     }
 
@@ -183,12 +181,13 @@ UCTNode * UCT::select_lcb(std::vector<UCTNode> &children, int N) {
 
 Action UCT::search(std::unique_ptr<open_spiel::State> &state, int turn_number, bool verbose, std::string output_file) {
     auto start = high_resolution_clock::now();
+    Action selected_action;
     UCTNode root_node;
     std::unique_ptr<open_spiel::State> root;
     root_node.visit_count = 0.0;
     root_node.cum_value = 0.0;
         for (auto child = root_node.children.begin(); child < root_node.children.end(); child++)
-            printNode((*child));
+            printNode((**child));
 
     for (int i = 0; i < budget; i++) {
         root = state->Clone();
@@ -201,15 +200,30 @@ Action UCT::search(std::unique_ptr<open_spiel::State> &state, int turn_number, b
 
     if (verbose) {
         for (auto child = root_node.children.begin(); child < root_node.children.end(); child++)
-            printNode((*child));
+            printNode((**child));
 
         printNode(*selection);
     }
     writeNode(root_node, turn_number, duration.count(), output_file);
 
-    return (*selection).action;
+    selected_action = (*selection).action;
+
+    delete_tree(root_node);
+
+    return selected_action;
 }
 
+void UCT::delete_tree(UCTNode &root_node) {
+    UCTNode *temp;
+    if (root_node.children.empty()) {
+        return;
+    } else {
+        for (auto child = root_node.children.begin(); child < root_node.children.end(); child++) {
+            delete_tree(**child);
+            temp =  (*child);
+            delete temp;
+        }
+    }
 }
-}
+
 }

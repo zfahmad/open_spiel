@@ -17,7 +17,7 @@ struct UCTNode {
     float visit_count;
     float cum_value;
     float ucb_value;
-    std::vector<UCTNode> children;
+    std::vector<UCTNode *> children;
 };
 
 void printNode(UCTNode &node);
@@ -31,13 +31,14 @@ public:
     UCT(float c, int b)
         : uct_c(c), budget(b) {}
     Action search(std::unique_ptr<open_spiel::State> &state, int turn_number, bool verbose=false, std::string output_file="");
-    UCTNode * select_lcb(std::vector<UCTNode> &children, int N);
-    UCTNode * sample_ucb(std::vector<UCTNode> &children, int N);
+    UCTNode * select_lcb(std::vector<UCTNode *> &children, int N);
+    UCTNode * sample_ucb(std::vector<UCTNode *> &children, int N);
     float traverse(std::unique_ptr<open_spiel::State> &root, UCTNode &root_node);
-    std::vector<UCTNode> expand(std::unique_ptr<open_spiel::State> &root);
+    std::vector<UCTNode *> expand(std::unique_ptr<open_spiel::State> &root);
     float rollout(std::unique_ptr<open_spiel::State> &root);
-    float get_c() { return uct_c; }
-    int get_budget() { return budget; }
+    float get_c() const { return uct_c; }
+    int get_budget() const { return budget; }
+    void delete_tree(UCTNode &root_node);
 };
 
 }
