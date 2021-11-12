@@ -39,6 +39,7 @@ public:
     Action search(std::unique_ptr<open_spiel::State> &state, int turn_number, bool verbose, std::string output_file);
     BFSNode * select_best(std::vector<BFSNode *> &children);
     BFSNode * build_tree(std::unique_ptr<open_spiel::State> &state);
+    void delete_tree(BFSNode *root_node);
     float minimax(BFSNode &root_node);
 };
 

@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <cstdlib>
 
 #include "open_spiel/algorithms/alpha_zero_torch/uct.h"
 #include "open_spiel/algorithms/alpha_zero_torch/puct.h"
@@ -16,7 +17,7 @@ namespace torch_az {
 int playGame(std::shared_ptr<const Game> &game) {
     std::unique_ptr<open_spiel::State> state = game->NewInitialState();
     std::unique_ptr<open_spiel::State> root;
-    UCT mcts = UCT(0.98, pow(2, 16));
+    UCT mcts = UCT(0.98, 5096);
     UCTNode node;
     std::vector<UCTNode>::iterator child;
     node.visit_count = 16;
@@ -48,13 +49,13 @@ int playGame(std::shared_ptr<const Game> &game) {
     mcts.search(state, 1, true, "test_file.txt");
 
     std::string graph_def = "vnet.pb";
-    std::string path = "/Users/zaheen/projects/open_spiel/open_spiel/algorithms/alpha_zero_torch/";
+    std::string path = std::getenv("C4_MODEL_PATH");// "/Users/zaheen/projects/open_spiel/open_spiel/algorithms/alpha_zero_torch/";
     open_spiel::algorithms::torch_az::CreateGraphDef(*game, 0.0001, 1, path,
             graph_def, "resnet", 256, 10);
     open_spiel::algorithms::torch_az::VPNetModel *model = new open_spiel::algorithms::torch_az::VPNetModel(*game, 
-            path, graph_def, "cpu:0");
-    model->LoadCheckpoint(path.append("checkpoint-1500"));
-//    PUCT pmcts = PUCT(0.98, 128, *model);
+            path, graph_def, std::getenv("C4_DEVICE"));
+    model->LoadCheckpoint(path.append("/checkpoint-1500"));
+    PUCT pmcts = PUCT(0.98, 32, *model);
 //    PUCTNode puct_node;
 //    puct_node.visit_count = 0;
 //    puct_node.cum_value = 0;
@@ -69,8 +70,9 @@ int playGame(std::shared_ptr<const Game> &game) {
     //     printNode(*pchild);
     // }
 
-//    pmcts.search(state, 0, false, "test_file.txt");
-    
+    pmcts.search(state, 0, false, "test_file.txt");
+    pmcts.search(state, 0, false, "test_file.txt");
+
     LTS lts_search = LTS(16, *model);
 
     // LTSNode lnode;
@@ -85,8 +87,9 @@ int playGame(std::shared_ptr<const Game> &game) {
     //     printNode(*lchild);
     // }
 //    lts_search.search(state, 0, true, "");
-    BFLTS bflts = BFLTS(game, 15, *model);
-//    bflts.search(state, 0, true, "");
+    BFLTS bflts = BFLTS(game, 16, *model);
+    bflts.search(state, 0, true, "test_file.txt");
+    bflts.search(state, 0, true, "test_file.txt");
 
     // root = state->Clone();
     // auto rand_evaluator = std::make_shared<RandomRolloutEvaluator>(1, 1);

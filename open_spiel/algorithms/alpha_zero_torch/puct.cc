@@ -32,35 +32,35 @@ void writeNode(const PUCTNode &node, int turn_number, float duration, std::strin
     os_stream << "Player: " << turn_number % 2 << std::endl;
     os_stream << "Elapsed time: " << duration << "\n" << std::endl;
     for (auto child = node.children.begin(); child < node.children.end(); child++) {
-        os_stream << "Action: " << (*child).action << std::endl
-                  << "Prior: " << (*child).prior << std::endl
-                  << "Exp. Value: " << (*child).cum_value / (*child).visit_count << std::endl
-                  << "UCB Value: " << (*child).pucb_value << std::endl
-                  << "Visits: " << (*child).visit_count << "\n" << std::endl;
+        os_stream << "Action: " << (*child)->action << std::endl
+                  << "Prior: " << (*child)->prior << std::endl
+                  << "Exp. Value: " << (*child)->cum_value / (*child)->visit_count << std::endl
+                  << "UCB Value: " << (*child)->pucb_value << std::endl
+                  << "Visits: " << (*child)->visit_count << "\n" << std::endl;
     }
     os_stream << "=====================================\n\n" << std::endl;
     os_stream.close();
 }
 
-PUCTNode * PUCT::sample_pucb(std::vector<PUCTNode> &children, int N) {
+PUCTNode * PUCT::sample_pucb(std::vector<PUCTNode *> &children, int N) {
     std::vector<PUCTNode *> best_children, best_child;
-    std::vector<PUCTNode>::iterator child;
+    std::vector<PUCTNode *>::iterator child;
     float max_value = -std::numeric_limits<float>::infinity();
 
     for (child = children.begin(); child < children.end(); child++) {
-        if ((*child).visit_count == 0) {
-            (*child).pucb_value = std::numeric_limits<float>::infinity();
+        if ((*child)->visit_count == 0) {
+            (*child)->pucb_value = puct_c * (*child)->prior * sqrt(N / (1 + (*child)->visit_count));
         } else {
-            (*child).pucb_value = (*child).cum_value / (*child).visit_count
-                + puct_c * (*child).prior * sqrt(N / (*child).visit_count);
+            (*child)->pucb_value = (*child)->cum_value / (*child)->visit_count
+                + puct_c * (*child)->prior * sqrt(N / (1 + (*child)->visit_count));
         }
 
-        if ((*child).pucb_value > max_value) {
+        if ((*child)->pucb_value > max_value) {
             best_children.clear();
-            best_children.push_back(&(*child));
-            max_value = (*child).pucb_value;
-        } else if ((*child).pucb_value == max_value) {
-            best_children.push_back(&(*child));
+            best_children.push_back((*child));
+            max_value = (*child)->pucb_value;
+        } else if ((*child)->pucb_value == max_value) {
+            best_children.push_back((*child));
         }
     }
 
@@ -109,12 +109,12 @@ float PUCT::traverse(std::unique_ptr<open_spiel::State> &root, PUCTNode &root_no
     return 0.0;
 }
 
-std::tuple<std::vector<PUCTNode>, double> PUCT::expand(std::unique_ptr<open_spiel::State> &root) {
+std::tuple<std::vector<PUCTNode *>, double> PUCT::expand(std::unique_ptr<open_spiel::State> &root) {
      // std::cout << root << std::endl;
      std::vector<Action> actions;
      actions = root->LegalActions();
      std::vector<Action>::iterator action;
-     std::vector<PUCTNode> children;
+     std::vector<PUCTNode *> children;
      VPNetModel::InferenceInputs inputs = {actions, root->ObservationTensor()};
      std::vector<VPNetModel::InferenceOutputs> outputs;
      outputs = model.Inference(std::vector{inputs});
@@ -129,7 +129,7 @@ std::tuple<std::vector<PUCTNode>, double> PUCT::expand(std::unique_ptr<open_spie
          child->prior = outputs[0].policy[i].second;
          child->visit_count = 0;
          child->cum_value = 0;
-         children.push_back(*child);
+         children.push_back(child);
      }
 
      value = outputs[0].value;
@@ -140,18 +140,18 @@ std::tuple<std::vector<PUCTNode>, double> PUCT::expand(std::unique_ptr<open_spie
      return {children, value};
 }
 
-PUCTNode * PUCT::select_node(std::vector<PUCTNode> &children) {
+PUCTNode * PUCT::select_node(std::vector<PUCTNode *> &children) {
     std::vector<PUCTNode *> best_children, best_child;
-    std::vector<PUCTNode>::iterator child;
+    std::vector<PUCTNode *>::iterator child;
     float max_count = -std::numeric_limits<float>::infinity();
 
     for (child = children.begin(); child < children.end(); child++) {
-        if ((*child).visit_count > max_count) {
+        if ((*child)->visit_count > max_count) {
             best_children.clear();
-            best_children.push_back(&(*child));
-            max_count = (*child).visit_count;
-        } else if ((*child).visit_count == max_count) {
-            best_children.push_back(&(*child));
+            best_children.push_back(*child);
+            max_count = (*child)->visit_count;
+        } else if ((*child)->visit_count == max_count) {
+            best_children.push_back(*child);
         }
     }
 
@@ -182,8 +182,22 @@ Action PUCT::search(std::unique_ptr<open_spiel::State> &state, int turn_number, 
         printNode(*selection);
     }
     writeNode(root_node, turn_number, duration.count(), output_file);
+    delete_tree(root_node);
 
     return (*selection).action;
+}
+
+void PUCT::delete_tree(PUCTNode &root_node) {
+    PUCTNode *temp;
+    if (root_node.children.empty()) {
+        return;
+    } else {
+        for (auto child = root_node.children.begin(); child < root_node.children.end(); child++) {
+            delete_tree(**child);
+            temp =  (*child);
+            delete temp;
+        }
+    }
 }
 
 }

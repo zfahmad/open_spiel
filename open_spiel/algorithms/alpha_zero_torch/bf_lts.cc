@@ -116,9 +116,11 @@ Action BFLTS::search(std::unique_ptr<open_spiel::State> &state, int turn_number,
     }
     auto stop = high_resolution_clock::now();
     BFSNode *selection = select_best(tree->children);
+    auto best_action = selection->action;
     auto duration = duration_cast<milliseconds>(stop - start);
     writeNode(*tree, turn_number, duration.count(), output_file);
-    return selection->action;
+    delete_tree(tree);
+    return best_action;
 }
 
 BFSNode * BFLTS::build_tree(std::unique_ptr<open_spiel::State> &state) {
@@ -191,6 +193,19 @@ float BFLTS::minimax(BFSNode &root_node) {
     root_node.minimax_val = -value;
 //    std::cout << value << std::endl;
     return -value;
+}
+
+void BFLTS::delete_tree(BFSNode *root_node) {
+    BFSNode *temp;
+    if (root_node->children.empty()) {
+        return;
+    } else {
+        for (auto child = root_node->children.begin(); child < root_node->children.end(); child++) {
+            delete_tree(*child);
+            temp =  (*child);
+            delete temp;
+        }
+    }
 }
 
 }
