@@ -116,11 +116,11 @@ Action BFLTS::search(std::unique_ptr<open_spiel::State> &state, int turn_number,
     }
     auto stop = high_resolution_clock::now();
     BFSNode *selection = select_best(tree->children);
-    auto best_action = selection->action;
+    auto selected_action = selection->action;
     auto duration = duration_cast<milliseconds>(stop - start);
     writeNode(*tree, turn_number, duration.count(), output_file);
     delete_tree(tree);
-    return best_action;
+    return selected_action;
 }
 
 BFSNode * BFLTS::build_tree(std::unique_ptr<open_spiel::State> &state) {

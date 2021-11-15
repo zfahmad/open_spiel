@@ -175,6 +175,7 @@ Action PUCT::search(std::unique_ptr<open_spiel::State> &state, int turn_number, 
     }
 
     PUCTNode *selection = select_node(root_node.children);
+    auto selected_action = selection->action;
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<milliseconds>(stop - start);
 
@@ -184,7 +185,7 @@ Action PUCT::search(std::unique_ptr<open_spiel::State> &state, int turn_number, 
     writeNode(root_node, turn_number, duration.count(), output_file);
     delete_tree(root_node);
 
-    return (*selection).action;
+    return selected_action;
 }
 
 void PUCT::delete_tree(PUCTNode &root_node) {

@@ -272,11 +272,12 @@ Action LTS::search(std::unique_ptr<open_spiel::State> &state, int turn_number, b
     }
 
     LTSNode *selection = select_best(current_candidates);
+    auto selected_action = selection->action;
 
     auto duration = duration_cast<milliseconds>(stop - start);
     writeNode(root_node, turn_number, duration.count(), output_file);
 
-    return (*selection).action;
+    return selected_action;
 }
 
 void LTS::delete_tree(LTSNode &root_node) {
