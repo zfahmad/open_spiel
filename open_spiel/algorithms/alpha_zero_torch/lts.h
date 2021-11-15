@@ -20,7 +20,7 @@ struct LTSNode {
     float pred_val;
     float minimax_val;
     bool terminal;
-    std::vector<LTSNode> children;
+    std::vector<LTSNode *> children;
 };
 
 void printNode(const LTSNode &node);
@@ -37,12 +37,13 @@ private:
 public:
     LTS(int b, VPNetModel &model)
         : budget(b), model(model) {}
-    std::vector<LTSNode> expand(std::unique_ptr<open_spiel::State> &root, LTSNode &root_node);
+    std::vector<LTSNode *> expand(std::unique_ptr<open_spiel::State> &root, LTSNode &root_node);
     float traverse(std::unique_ptr<open_spiel::State> &root, LTSNode &root_node);
     void build(std::unique_ptr<open_spiel::State> &root, LTSNode &root_node);
     float minimax(LTSNode &root_node, float bound);
-    LTSNode * select_best(std::vector<LTSNode> &children);
+    LTSNode * select_best(std::vector<LTSNode *> &children);
     Action search(std::unique_ptr<open_spiel::State> &state, int turn_number, bool verbose, std::string output_file);
+    void delete_tree(LTSNode &root_node);
 };
 
 }

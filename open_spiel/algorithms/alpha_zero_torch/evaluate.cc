@@ -73,7 +73,7 @@ int playGame(std::shared_ptr<const Game> &game) {
     pmcts.search(state, 0, false, "test_file.txt");
     pmcts.search(state, 0, false, "test_file.txt");
 
-    LTS lts_search = LTS(16, *model);
+    LTS lts_search = LTS(32, *model);
 
     // LTSNode lnode;
     // lnode.depth = 1;
@@ -86,8 +86,10 @@ int playGame(std::shared_ptr<const Game> &game) {
     // for (auto lchild = lnode.children.begin(); lchild < lnode.children.end(); lchild++) {
     //     printNode(*lchild);
     // }
-//    lts_search.search(state, 0, true, "");
-    BFLTS bflts = BFLTS(game, 16, *model);
+    lts_search.search(state, 0, true, "test_file.txt");
+    lts_search.search(state, 0, true, "test_file.txt");
+
+    BFLTS bflts = BFLTS(game, 32, *model);
     bflts.search(state, 0, true, "test_file.txt");
     bflts.search(state, 0, true, "test_file.txt");
 

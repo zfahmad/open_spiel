@@ -32,24 +32,24 @@ void writeNode(const LTSNode &node, int turn_number, float duration, std::string
     os_stream << "Player: " << turn_number % 2 << std::endl;
     os_stream << "Elapsed time: " << duration << "\n" << std::endl;
     for (auto child = node.children.begin(); child < node.children.end(); child++) {
-        os_stream << "Action: " << (*child).action << std::endl
-                  << "Depth: " << (*child).depth << std::endl
-                  << "Minimax Value: " << (*child).minimax_val << std::endl
-                  << "Predicted Value: " << (*child).pred_val << std::endl
-                  << "Actor RP: " << (*child).actor_rp << std::endl
-                  << "Eventual RP: " << (*child).eventual_rp << std::endl
-                  << "Cost: " << (*child).cost << std::endl
-                  << "Terminal: " << (*child).terminal << "\n" << std::endl;
+        os_stream << "Action: " << (*child)->action << std::endl
+                  << "Depth: " << (*child)->depth << std::endl
+                  << "Minimax Value: " << (*child)->minimax_val << std::endl
+                  << "Predicted Value: " << (*child)->pred_val << std::endl
+                  << "Actor RP: " << (*child)->actor_rp << std::endl
+                  << "Eventual RP: " << (*child)->eventual_rp << std::endl
+                  << "Cost: " << (*child)->cost << std::endl
+                  << "Terminal: " << (*child)->terminal << "\n" << std::endl;
     }
     os_stream << "=====================================\n\n" << std::endl;
     os_stream.close();
 }
 
-std::vector<LTSNode> LTS::expand(std::unique_ptr<open_spiel::State> &root, LTSNode &root_node) {
+std::vector<LTSNode *> LTS::expand(std::unique_ptr<open_spiel::State> &root, LTSNode &root_node) {
      std::vector<Action> actions;
      actions = root->LegalActions();
      std::vector<Action>::iterator action;
-     std::vector<LTSNode> children;
+     std::vector<LTSNode *> children;
      VPNetModel::InferenceInputs inputs = {actions, root->ObservationTensor()};
      std::vector<VPNetModel::InferenceOutputs> outputs;
      outputs = model.Inference(std::vector{inputs});
@@ -67,7 +67,7 @@ std::vector<LTSNode> LTS::expand(std::unique_ptr<open_spiel::State> &root, LTSNo
          child->cost = log(child->depth) - std::max(child->actor_rp, child->eventual_rp);
          child->minimax_val = 99.0;
          child->terminal = false;
-         children.push_back(*child);
+         children.push_back(child);
      }
 
      root_node.pred_val = outputs[0].value;
@@ -108,13 +108,13 @@ float LTS::traverse(std::unique_ptr<open_spiel::State> &root, LTSNode &root_node
         bool has_children = false;
         for (auto child = root_node.children.begin(); child < root_node.children.end(); child++) {
             // std::cout << (*child).cost << " " << current_bound << std::endl;
-            if (child->cost > current_bound)
-                next_bound = std::min(next_bound, child->cost);
-            if ((*child).cost <= current_bound && terminate == false) {
+            if ((*child)->cost > current_bound)
+                next_bound = std::min(next_bound, (*child)->cost);
+            if ((*child)->cost <= current_bound && terminate == false) {
                 has_children = true;
                 next_state = root->Clone();
-                next_state->ApplyAction((*child).action);
-                child_val = traverse(next_state, *child);
+                next_state->ApplyAction((*child)->action);
+                child_val = traverse(next_state, **child);
                 // traverse(next_state, *child, model);
                 value = std::max(child_val, value);
             }
@@ -155,12 +155,12 @@ void LTS::build(std::unique_ptr<open_spiel::State> &root, LTSNode &root_node) {
         }
 
         for (auto child = root_node.children.begin(); child < root_node.children.end(); child++) {
-            if (child->cost > current_bound)
-                next_bound = std::min(next_bound, child->cost);
-            if ((*child).cost <= current_bound && terminate == false) {
+            if ((*child)->cost > current_bound)
+                next_bound = std::min(next_bound, (*child)->cost);
+            if ((*child)->cost <= current_bound && terminate == false) {
                 next_state = root->Clone();
-                next_state->ApplyAction((*child).action);
-                build(next_state, *child);
+                next_state->ApplyAction((*child)->action);
+                build(next_state, **child);
             }
         }
     }
@@ -179,9 +179,9 @@ float LTS::minimax(LTSNode &root_node, float bound) {
 
     for (auto child = root_node.children.begin(); child < root_node.children.end(); child++) {
         // std::cout << "Looking at children" << std::endl;
-        if ((*child).cost <= bound) {
+        if ((*child)->cost <= bound) {
             has_children = true;
-            child_val = minimax(*child, bound);
+            child_val = minimax(**child, bound);
             value = std::max(child_val, value);
         }
     }
@@ -194,18 +194,18 @@ float LTS::minimax(LTSNode &root_node, float bound) {
     return -value;
 }
 
-LTSNode * LTS::select_best(std::vector<LTSNode> &children) {
+LTSNode * LTS::select_best(std::vector<LTSNode *> &children) {
     std::vector<LTSNode *> best_children, best_child;
-    std::vector<LTSNode>::iterator child;
+    std::vector<LTSNode *>::iterator child;
     float max_val = -std::numeric_limits<float>::infinity();
 
     for (child = children.begin(); child < children.end(); child++) {
-        if ((*child).minimax_val > max_val) {
+        if ((*child)->minimax_val > max_val) {
             best_children.clear();
-            best_children.push_back(&(*child));
-            max_val = (*child).minimax_val;
-        } else if ((*child).minimax_val == max_val) {
-            best_children.push_back(&(*child));
+            best_children.push_back((*child));
+            max_val = (*child)->minimax_val;
+        } else if ((*child)->minimax_val == max_val) {
+            best_children.push_back((*child));
         }
     }
 
@@ -227,7 +227,7 @@ Action LTS::search(std::unique_ptr<open_spiel::State> &state, int turn_number, b
     root_node.visited = false;
     root_node.terminal = false;
     std::unique_ptr<open_spiel::State> root;
-    std::vector<LTSNode> current_candidates;
+    std::vector<LTSNode *> current_candidates;
     current_bound = 0.0;
     // current_bound = std::numeric_limits<float>::infinity();
     next_bound = std::numeric_limits<float>::infinity();
@@ -267,7 +267,7 @@ Action LTS::search(std::unique_ptr<open_spiel::State> &state, int turn_number, b
     if (verbose) {
         std::cout << "Finished search over with minimax value: " << -value << std::endl;
         for (auto child = current_candidates.begin(); child < current_candidates.end(); child++) {
-            printNode((*child));
+            printNode((**child));
         }
     }
 
@@ -277,6 +277,19 @@ Action LTS::search(std::unique_ptr<open_spiel::State> &state, int turn_number, b
     writeNode(root_node, turn_number, duration.count(), output_file);
 
     return (*selection).action;
+}
+
+void LTS::delete_tree(LTSNode &root_node) {
+    LTSNode *temp;
+    if (root_node.children.empty()) {
+        return;
+    } else {
+        for (auto child = root_node.children.begin(); child < root_node.children.end(); child++) {
+            delete_tree(**child);
+            temp =  (*child);
+            delete temp;
+        }
+    }
 }
 
 }
