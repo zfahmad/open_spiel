@@ -48,7 +48,6 @@ bool operator> (const BFSNode &node_1, const BFSNode &node_2) {
 void BFLTS::generate_children(std::unique_ptr<open_spiel::State> &root, BFSNode &root_node) {
     std::vector<Action> actions;
     actions = root->LegalActions();
-    std::vector<Action>::iterator action;
     VPNetModel::InferenceInputs inputs = {actions, root->ObservationTensor()};
     std::vector<VPNetModel::InferenceOutputs> outputs;
     outputs = model.Inference(std::vector{inputs});
@@ -70,7 +69,7 @@ void BFLTS::generate_children(std::unique_ptr<open_spiel::State> &root, BFSNode 
         child->minimax_val = NULL;
         child->pred_val = NULL;
         child->terminal = false;
-        pq.push(*child);
+        pq.push(child);
     }
 
     root_node.pred_val = outputs[0].value;
@@ -105,7 +104,9 @@ Action BFLTS::search(std::unique_ptr<open_spiel::State> &state, int turn_number,
     auto start = high_resolution_clock::now();
     float value;
     BFSNode *tree;
+    std::cout << "Building tree." << std::endl;
     tree = build_tree(state);
+    std::cout << "Doing minimax." << std::endl;
     value = minimax(*tree);
     std::cout << "Value returned: " << -value << std::endl;
     if (verbose) {
@@ -127,23 +128,22 @@ BFSNode * BFLTS::build_tree(std::unique_ptr<open_spiel::State> &state) {
     std::unique_ptr<open_spiel::State> root;
     root = state->Clone();
     int i = 0;
-    BFSNode root_node;
+    BFSNode *root_node;
     BFSNode *tree, *node;
-    root_node.action = NULL;
-    root_node.state_str = root->Serialize();
-    root_node.parent = nullptr;
-    root_node.depth = 1;
-    root_node.actor_rp = 0.0;
-    root_node.eventual_rp = 0.0;
-    root_node.cost = 0.0;
-    root_node.terminal = false;
+    root_node->action = NULL;
+    root_node->state_str = root->Serialize();
+    root_node->parent = nullptr;
+    root_node->depth = 1;
+    root_node->actor_rp = 0.0;
+    root_node->eventual_rp = 0.0;
+    root_node->cost = 0.0;
+    root_node->terminal = false;
     pq.push(root_node);
 
 //    std::cout << "In tree: " << std::endl;
 //    for (int i = 0; i < budget; i++) {
     while (!pq.empty() && i < budget) {
-        node = new BFSNode;
-        *node = pq.top();
+        node = pq.top();
         pq.pop();
 //        printNode(*node);
 //        std::cout << root << std::endl;

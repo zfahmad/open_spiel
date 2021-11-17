@@ -95,9 +95,9 @@ void LTSvPUCT(std::shared_ptr<const Game> &game, int budget, VPNetModel &model) 
 void evaluatePUCT(std::shared_ptr<const Game> &game, int budget, int model_num, int num_games, VPNetModel &model) {
     std::unique_ptr<open_spiel::State> state;
     PUCT p1 = PUCT(0.99, budget, model);
-    UCT p2 = UCT(0.98, 1024);
-    int p1_rate[3] = {0, 0, 0};
-    int p2_rate[3] = {0, 0, 0};
+    UCT p2 = UCT(0.98, 65536);
+    int p1_rate[4] = {0, 0, 0, 0};
+    int p2_rate[4] = {0, 0, 0, 0};
 
     std::string output_file = "results/summary/eval_puct_" + std::to_string(budget) + "_" + std::to_string(model_num) + ".txt";
     std::ofstream os_stream;
@@ -140,10 +140,11 @@ void evaluatePUCT(std::shared_ptr<const Game> &game, int budget, int model_num, 
                     p1_rate[1] += 1;
                 }
             }
+            p1_rate[3] += 1;
         }
         game_stream.close();
     }
-    os_stream << std::to_string(p1_rate[0]) + " " + std::to_string(p1_rate[1]) + " " + std::to_string(p1_rate[2]) + "\n" << std::endl;
+    os_stream << std::to_string(p1_rate[0]) + " " + std::to_string(p1_rate[1]) + " " + std::to_string(p1_rate[2]) + " " + std::to_string(p1_rate[3] / num_games) + "\n" << std::endl;
 
     for (int eval_num = 0; eval_num < num_games; eval_num++) {
         std::string game_file = "results/eval_puct_p2_" + std::to_string(budget) + "_" + std::to_string(model_num) + "_" + std::to_string(eval_num) + "_game.txt";
@@ -182,10 +183,11 @@ void evaluatePUCT(std::shared_ptr<const Game> &game, int budget, int model_num, 
                     p2_rate[0] += 1;
                 }
             }
+            p2_rate[3] += 1;
         }
         game_stream.close();
     }
-    os_stream << std::to_string(p2_rate[0]) + " " + std::to_string(p2_rate[1]) + " " + std::to_string(p2_rate[2]) + "\n" << std::endl;
+    os_stream << std::to_string(p2_rate[0]) + " " + std::to_string(p2_rate[1]) + " " + std::to_string(p2_rate[2]) +  " " + std::to_string(p2_rate[3] / num_games) + "\n" << std::endl;
     os_stream.close();
 }
 
@@ -193,8 +195,8 @@ void evaluateBFLTS(std::shared_ptr<const Game> &game, int budget, int model_num,
     std::unique_ptr<open_spiel::State> state;
     BFLTS p1 = BFLTS(game, budget, model);
     UCT p2 = UCT(0.98, 65536);
-    int p1_rate[3] = {0, 0, 0};
-    int p2_rate[3] = {0, 0, 0};
+    int p1_rate[4] = {0, 0, 0, 0};
+    int p2_rate[4] = {0, 0, 0, 0};
 
     std::string output_file = "results/summary/eval_bflts_" + std::to_string(budget) + "_" + std::to_string(model_num) + ".txt";
     std::ofstream os_stream;
@@ -213,6 +215,7 @@ void evaluateBFLTS(std::shared_ptr<const Game> &game, int budget, int model_num,
 
 
         while (!finish) {
+            std::cout << "New turn." << std::endl;
             if (turn_number % 2)
                 action = p2.search(state, turn_number, false,
                                    "results/eval_bflts_p1_" + std::to_string(budget) + "_" + std::to_string(model_num) +
@@ -223,6 +226,7 @@ void evaluateBFLTS(std::shared_ptr<const Game> &game, int budget, int model_num,
                                    "results/eval_bflts_p1_" + std::to_string(budget) + "_" + std::to_string(model_num) +
                                    "_" +
                                    std::to_string(eval_num) + "_stats.txt");
+            std::cout << "Search Done." << std::endl;
             state->ApplyAction(action);
             std::cout << state << std::endl;
             game_stream << state << std::endl;
@@ -237,10 +241,11 @@ void evaluateBFLTS(std::shared_ptr<const Game> &game, int budget, int model_num,
                     p1_rate[1] += 1;
                 }
             }
+            p1_rate[3] += 1;
         }
         game_stream.close();
     }
-    os_stream << std::to_string(p1_rate[0]) + " " + std::to_string(p1_rate[1]) + " " + std::to_string(p1_rate[2]) + "\n" << std::endl;
+    os_stream << std::to_string(p1_rate[0]) + " " + std::to_string(p1_rate[1]) + " " + std::to_string(p1_rate[2]) + " " + std::to_string(p1_rate[3] / num_games) + "\n" << std::endl;
 
     for (int eval_num = 0; eval_num < num_games; eval_num++) {
         std::string game_file = "results/eval_bflts_p2_" + std::to_string(budget) + "_" + std::to_string(model_num) + "_" + std::to_string(eval_num) + "_game.txt";
@@ -279,10 +284,11 @@ void evaluateBFLTS(std::shared_ptr<const Game> &game, int budget, int model_num,
                     p2_rate[0] += 1;
                 }
             }
+            p2_rate[3] += 1;
         }
         game_stream.close();
     }
-    os_stream << std::to_string(p2_rate[0]) + " " + std::to_string(p2_rate[1]) + " " + std::to_string(p2_rate[2]) + "\n" << std::endl;
+    os_stream << std::to_string(p2_rate[0]) + " " + std::to_string(p2_rate[1]) + " " + std::to_string(p2_rate[2]) +  " " + std::to_string(p2_rate[3] / num_games) + "\n" << std::endl;
     os_stream.close();
 }
 
@@ -290,10 +296,10 @@ void evaluateLTS(std::shared_ptr<const Game> &game, int budget, int model_num, i
     std::unique_ptr<open_spiel::State> state;
     LTS p1 = LTS(budget, model);
     UCT p2 = UCT(0.98, 65536);
-    int p1_rate[3] = {0, 0, 0};
-    int p2_rate[3] = {0, 0, 0};
+    int p1_rate[4] = {0, 0, 0, 0};
+    int p2_rate[4] = {0, 0, 0, 0};
 
-    std::string output_file = "results/summary/eval_bflts_" + std::to_string(budget) + "_" + std::to_string(model_num) + ".txt";
+    std::string output_file = "results/summary/eval_lts_" + std::to_string(budget) + "_" + std::to_string(model_num) + ".txt";
     std::ofstream os_stream;
     os_stream.open(output_file);
 
@@ -334,10 +340,11 @@ void evaluateLTS(std::shared_ptr<const Game> &game, int budget, int model_num, i
                     p1_rate[1] += 1;
                 }
             }
+            p1_rate[3] += 1;
         }
         game_stream.close();
     }
-    os_stream << std::to_string(p1_rate[0]) + " " + std::to_string(p1_rate[1]) + " " + std::to_string(p1_rate[2]) + "\n" << std::endl;
+    os_stream << std::to_string(p1_rate[0]) + " " + std::to_string(p1_rate[1]) + " " + std::to_string(p1_rate[2]) + " " + std::to_string(p1_rate[3] / num_games) + "\n" << std::endl;
 
     for (int eval_num = 0; eval_num < num_games; eval_num++) {
         std::string game_file = "results/eval_lts_p2_" + std::to_string(budget) + "_" + std::to_string(model_num) + "_" + std::to_string(eval_num) + "_game.txt";
@@ -376,10 +383,11 @@ void evaluateLTS(std::shared_ptr<const Game> &game, int budget, int model_num, i
                     p2_rate[0] += 1;
                 }
             }
+            p2_rate[3] += 1;
         }
         game_stream.close();
     }
-    os_stream << std::to_string(p2_rate[0]) + " " + std::to_string(p2_rate[1]) + " " + std::to_string(p2_rate[2]) + "\n" << std::endl;
+    os_stream << std::to_string(p2_rate[0]) + " " + std::to_string(p2_rate[1]) + " " + std::to_string(p2_rate[2]) +  " " + std::to_string(p2_rate[3] / num_games) + "\n" << std::endl;
     os_stream.close();
 }
 
@@ -395,9 +403,9 @@ int main(int argc, char **argv) {
         new open_spiel::algorithms::torch_az::VPNetModel(*game, path, graph_def, std::getenv("C4_DEVICE"));
     model->LoadCheckpoint(path.append("/checkpoint-1500"));
     // open_spiel::algorithms::torch_az::UCTvUCT(game, 2048, "test_game.txt");
-    for (int b = 16; b < 33; b *= 2) {
-        open_spiel::algorithms::torch_az::evaluatePUCT(game, b, 1500, 5, *model);
-//        open_spiel::algorithms::torch_az::evaluateLTS(game, b, 1500, 5, *model);
-//        open_spiel::algorithms::torch_az::evaluateBFLTS(game, b, 1500, 5, *model);
+    for (int b = 16; b <= 1024; b *= 2) {
+        open_spiel::algorithms::torch_az::evaluatePUCT(game, b, 1500, 50, *model);
+        open_spiel::algorithms::torch_az::evaluateLTS(game, b, 1500, 50, *model);
+        // open_spiel::algorithms::torch_az::evaluateBFLTS(game, b, 1500, 3, *model);
     }
 }
