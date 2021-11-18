@@ -82,10 +82,15 @@ float LTS::traverse(std::unique_ptr<open_spiel::State> &root, LTSNode &root_node
     float value = -std::numeric_limits<float>::infinity();
     float child_val;
     std::unique_ptr<open_spiel::State> next_state;
-    // std::cout << root << std::endl;
+    for (int j = 0; j < root_node.depth; j++)
+        std::cout << " ";
+    std::cout << root_node.depth << " " << root_node.action << std::endl;
+//    std::cout << root << std::endl;
 
     if (root->IsTerminal()) {
-        // std::cout << "Terminal" << std::endl;
+        std::cout << "Terminal" << std::endl;
+//        std::cout << root << std::endl;
+
         if (root->Returns()[0] == 0.0) {
             value = 0.0;
         }
@@ -94,9 +99,11 @@ float LTS::traverse(std::unique_ptr<open_spiel::State> &root, LTSNode &root_node
         }
         // std::cout << "Returning" << std::endl;
     } else {
+//        std::cout << root << std::endl;
         if (!root_node.visited) {
             // std::cout << "Is terminal: " << root->IsTerminal() << std::endl;
             root_node.children = expand(root, root_node);
+
             search_count++;
             root_node.visited = true;
             if (search_count > budget) {
@@ -194,17 +201,17 @@ float LTS::minimax(LTSNode &root_node, float bound) {
     return -value;
 }
 
-LTSNode * LTS::select_best(std::vector<LTSNode *> &children) {
-    std::vector<LTSNode *> best_children, best_child;
-    std::vector<LTSNode *>::iterator child;
+LTSNode LTS::select_best(std::vector<LTSNode> &children) {
+    std::vector<LTSNode> best_children, best_child;
+    std::vector<LTSNode>::iterator child;
     float max_val = -std::numeric_limits<float>::infinity();
 
     for (child = children.begin(); child < children.end(); child++) {
-        if ((*child)->minimax_val > max_val) {
+        if ((*child).minimax_val > max_val) {
             best_children.clear();
             best_children.push_back((*child));
-            max_val = (*child)->minimax_val;
-        } else if ((*child)->minimax_val == max_val) {
+            max_val = (*child).minimax_val;
+        } else if ((*child).minimax_val == max_val) {
             best_children.push_back((*child));
         }
     }
@@ -227,7 +234,7 @@ Action LTS::search(std::unique_ptr<open_spiel::State> &state, int turn_number, b
     root_node.visited = false;
     root_node.terminal = false;
     std::unique_ptr<open_spiel::State> root;
-    std::vector<LTSNode *> current_candidates;
+    std::vector<LTSNode> current_candidates;
     current_bound = 0.0;
     // current_bound = std::numeric_limits<float>::infinity();
     next_bound = std::numeric_limits<float>::infinity();
@@ -247,7 +254,9 @@ Action LTS::search(std::unique_ptr<open_spiel::State> &state, int turn_number, b
         }
         if (!terminate) {
             bound = current_bound;
-            current_candidates = root_node.children;
+            current_candidates.clear();
+            for (auto child = root_node.children.begin(); child < root_node.children.end(); child++)
+                current_candidates.push_back(**child);
         }
 
         current_bound += log(sqrt(2));
@@ -267,12 +276,12 @@ Action LTS::search(std::unique_ptr<open_spiel::State> &state, int turn_number, b
     if (verbose) {
         std::cout << "Finished search over with minimax value: " << -value << std::endl;
         for (auto child = current_candidates.begin(); child < current_candidates.end(); child++) {
-            printNode((**child));
+            printNode((*child));
         }
     }
 
-    LTSNode *selection = select_best(current_candidates);
-    auto selected_action = selection->action;
+    LTSNode selection = select_best(current_candidates);
+    auto selected_action = selection.action;
 
     auto duration = duration_cast<milliseconds>(stop - start);
     writeNode(root_node, turn_number, duration.count(), output_file);
