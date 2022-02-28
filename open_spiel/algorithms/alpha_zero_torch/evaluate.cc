@@ -110,8 +110,9 @@ int playGame(std::shared_ptr<const Game> &game) {
     lts_search.search(state, 0, true, "test_file.txt");
 //    lts_search.search(state, 0, true, "test_file.txt");
 
-    BFLTS bflts = BFLTS(game, 32, *model);
-//    bflts.search(state, 0, true, "test_file.txt");
+    BFLTS bflts = BFLTS(game, 29, *model);
+//    state = game->NewInitialState();
+    bflts.search(state, 0, true, "test_file.txt");
 //    bflts.search(state, 0, true, "test_file.txt");
 
     // root = state->Clone();

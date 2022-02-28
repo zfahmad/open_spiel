@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <chrono>
+#include <limits>
 #include "open_spiel/algorithms/alpha_zero_torch/bf_lts.h"
 
 using namespace std::chrono;
@@ -8,6 +9,7 @@ namespace open_spiel::algorithms::torch_az {
 
 void printNode(const BFSNode &node) {
     std::cout << "Action: " << node.action << std::endl
+//              << "State: " << node.state << std::endl
               << "Depth: " << node.depth << std::endl
               << "Minimax Value: " << node.minimax_val << std::endl
               << "Predicted Value: " << node.pred_val << std::endl
@@ -45,35 +47,34 @@ bool operator> (const BFSNode &node_1, const BFSNode &node_2) {
     return node_1.cost > node_2.cost;
 }
 
-void BFLTS::generate_children(std::unique_ptr<open_spiel::State> &root, BFSNode &root_node) {
+void BFLTS::generate_children(BFSNode &root_node) {
     std::vector<Action> actions;
-    actions = root->LegalActions();
-    VPNetModel::InferenceInputs inputs = {actions, root->ObservationTensor()};
+    actions = root_node.state->LegalActions();
+    VPNetModel::InferenceInputs inputs = {actions, root_node.state->ObservationTensor()};
     std::vector<VPNetModel::InferenceOutputs> outputs;
     outputs = model.Inference(std::vector{inputs});
     float num_actions = actions.size();
-    std::string state_str = root->ToString();
+    std::string state_str = root_node.state->ToString();
     std::unique_ptr<open_spiel::State> new_state;
 
     for (int i = 0; i < num_actions; i++) {
         BFSNode *child = new BFSNode;
         child->action = outputs[0].policy[i].first;
-        new_state = root->Clone();
-        new_state->ApplyAction(child->action);
-        child->state_str = new_state->Serialize();
+        child->state = root_node.state->Clone();
+        child->state->ApplyAction(child->action);
         child->parent = &root_node;
         child->actor_rp = root_node.eventual_rp + log(outputs[0].policy[i].second);
         child->eventual_rp = root_node.actor_rp + log(1.0 / num_actions);
         child->depth = root_node.depth + 1;
         child->cost = log(child->depth) - std::max(child->actor_rp, child->eventual_rp);
-        child->minimax_val = NULL;
-        child->pred_val = NULL;
+        child->minimax_val = -std::numeric_limits<float>::infinity();
+        child->pred_val = -std::numeric_limits<float>::infinity();
         child->terminal = false;
         pq.push(child);
     }
 
     root_node.pred_val = outputs[0].value;
-    if (root->CurrentPlayer() == 1) {
+    if (root_node.state->CurrentPlayer() == 1) {
         root_node.pred_val = -root_node.pred_val;
     }
 }
@@ -100,7 +101,7 @@ BFSNode * BFLTS::select_best(std::vector<BFSNode *> &children) {
     return best_child.front();
 }
 
-Action BFLTS::search(std::unique_ptr<open_spiel::State> &state, int turn_number, bool verbose, std::string output_file) {
+BFSNode * BFLTS::search(std::unique_ptr<open_spiel::State> &state, int turn_number, bool verbose, std::string output_file) {
     auto start = high_resolution_clock::now();
     float value;
     BFSNode *tree;
@@ -116,51 +117,54 @@ Action BFLTS::search(std::unique_ptr<open_spiel::State> &state, int turn_number,
         }
     }
     auto stop = high_resolution_clock::now();
-    BFSNode *selection = select_best(tree->children);
-    auto selected_action = selection->action;
-    auto duration = duration_cast<milliseconds>(stop - start);
-    writeNode(*tree, turn_number, duration.count(), output_file);
-    delete_tree(tree);
-    return selected_action;
+//    BFSNode *selection = select_best(tree->children);
+//    auto selected_action = selection->action;
+//    auto duration = duration_cast<milliseconds>(stop - start);
+//    writeNode(*tree, turn_number, duration.count(), output_file);
+//    delete_tree(tree);
+    return tree;
 }
 
 BFSNode * BFLTS::build_tree(std::unique_ptr<open_spiel::State> &state) {
-    std::unique_ptr<open_spiel::State> root;
-    root = state->Clone();
     int i = 0;
-    BFSNode *root_node;
     BFSNode *tree, *node;
+    BFSNode *root_node = new BFSNode();
     root_node->action = NULL;
-    root_node->state_str = root->Serialize();
+    root_node->state = state->Clone();
     root_node->parent = nullptr;
     root_node->depth = 1;
     root_node->actor_rp = 0.0;
     root_node->eventual_rp = 0.0;
     root_node->cost = 0.0;
     root_node->terminal = false;
+//    delete root_node;
     pq.push(root_node);
+//    generate_children(*root_node);
 
 //    std::cout << "In tree: " << std::endl;
 //    for (int i = 0; i < budget; i++) {
     while (!pq.empty() && i < budget) {
+//    while (!pq.empty()) {
         node = pq.top();
         pq.pop();
-//        printNode(*node);
+        printNode(*node);
 //        std::cout << root << std::endl;
-        root = game->DeserializeState(node->state_str);
 //        std::cout << root << std::endl;
-        if (!root->IsTerminal()) {
-            generate_children(root, *node);
+
+        if (!node->state->IsTerminal()) {
+            generate_children(*node);
         } else {
             float value;
-            if (root->Returns()[0] == 0.0) {
+            if (node->state->Returns()[0] == 0.0) {
                 value = 0.0;
             }
             else {
                 value = -1.0;
             }
-            node->minimax_val = -value;
+            node->minimax_val = value;
+            node->terminal = true;
         }
+
         if (node->parent != nullptr)
             node->parent->children.push_back(node);
         else
@@ -171,14 +175,16 @@ BFSNode * BFLTS::build_tree(std::unique_ptr<open_spiel::State> &state) {
 }
 
 float BFLTS::minimax(BFSNode &root_node) {
+    for (int i = 0; i < root_node.depth; i++)
+        std::cout << " ";
+    std::cout << root_node.action << " " << root_node.depth << std::endl;
     float child_val, value = -std::numeric_limits<float>::infinity();
     bool has_children = false;
     // printNode(root_node);
 
     if (root_node.terminal) {
         value = root_node.minimax_val;
-//        std::cout << value << std::endl;
-        return value;
+        return -value;
     }
 
     if (root_node.children.empty()) {
@@ -191,7 +197,6 @@ float BFLTS::minimax(BFSNode &root_node) {
     }
 
     root_node.minimax_val = -value;
-//    std::cout << value << std::endl;
     return -value;
 }
 

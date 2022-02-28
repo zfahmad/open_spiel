@@ -9,9 +9,10 @@
 
 namespace open_spiel::algorithms::torch_az {
 
-struct BFSNode {
+class BFSNode {
+public:
     Action action;
-    std::string state_str;
+    std::unique_ptr<open_spiel::State> state;
     BFSNode *parent;
     int depth;
     float actor_rp;
@@ -21,6 +22,24 @@ struct BFSNode {
     float minimax_val;
     bool terminal;
     std::vector<BFSNode*> children;
+    BFSNode() {
+        action = NULL;
+        state = nullptr;
+        parent = nullptr;
+        depth = 0;
+        actor_rp = 0.0;
+        eventual_rp = 0.0;
+        cost = 0.0;
+        pred_val = -std::numeric_limits<float>::infinity();
+        minimax_val = -std::numeric_limits<float>::infinity();
+        terminal = false;
+    };
+};
+
+struct MyComparator {
+    bool operator() (BFSNode *arg_1, BFSNode *arg_2) {
+        return arg_1->cost > arg_2->cost;
+    }
 };
 
 void printNode(const BFSNode &node);
@@ -34,9 +53,9 @@ private:
 public:
     BFLTS(std::shared_ptr<const Game> &game, int budget, VPNetModel &model)
         : game(game), budget(budget), model(model) {}
-    std::priority_queue<BFSNode*, std::vector<BFSNode*>, std::greater<>> pq;
-    void generate_children(std::unique_ptr<open_spiel::State> &root, BFSNode &root_node);
-    Action search(std::unique_ptr<open_spiel::State> &state, int turn_number, bool verbose, std::string output_file);
+    std::priority_queue<BFSNode*, std::vector<BFSNode*>, MyComparator> pq;
+    void generate_children(BFSNode &root_node);
+    BFSNode * search(std::unique_ptr<open_spiel::State> &state, int turn_number, bool verbose, std::string output_file);
     BFSNode * select_best(std::vector<BFSNode *> &children);
     BFSNode * build_tree(std::unique_ptr<open_spiel::State> &state);
     void delete_tree(BFSNode *root_node);
