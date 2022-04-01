@@ -60,7 +60,6 @@ namespace open_spiel::algorithms::torch_az {
 
     class BF2LTSBot : public Bot {
     public:
-        std::priority_queue<SearchNode*, std::vector<SearchNode*>, MyComparator> pq;
         BF2LTSBot(const Game& game, std::shared_ptr<VPNetEvaluator> evaluator,
                 int max_simulations,
                 //int64_t max_memory_mb,  // Max memory use in megabytes.
@@ -68,7 +67,6 @@ namespace open_spiel::algorithms::torch_az {
         BF2LTSBot();
         ~BF2LTSBot() = default;
         SearchNode * BF2LTSearch(const State& state);
-        std::unique_ptr<SearchNode> BuildTree(const State& state);
         SearchNode * CreateSearchNode(const State& state, SearchNode *parent=NULL, int depth=1,
                                       float actor_rp=0.0, float eventual_rp=0.0, Action action=kInvalidAction,
                                       float cost=0.0);

@@ -24,7 +24,9 @@ if (OPEN_SPIEL_BUILD_WITH_LIBTORCH)
     bf_lts.h
     bf_lts.cc
     bf2lts.h
-    bf2lts.cc)
+    bf2lts.cc
+    lts_self_play.h
+    lts_self_play.cc)
 
   target_include_directories (alpha_zero_torch PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -54,13 +56,13 @@ if (OPEN_SPIEL_BUILD_WITH_LIBTORCH)
   add_executable(evaluate evaluate.cc ${OPEN_SPIEL_OBJECTS}
                 $<TARGET_OBJECTS:alpha_zero_torch> $<TARGET_OBJECTS:tests>)
 
-  add_executable(play play.cc ${OPEN_SPIEL_OBJECTS}
-                $<TARGET_OBJECTS:alpha_zero_torch> $<TARGET_OBJECTS:tests>)
+            # add_executable(play play.cc ${OPEN_SPIEL_OBJECTS}
+            #               $<TARGET_OBJECTS:alpha_zero_torch> $<TARGET_OBJECTS:tests>)
 
   add_executable(test_bf2lts test_bf2lts.cc ${OPEN_SPIEL_OBJECTS}
           $<TARGET_OBJECTS:alpha_zero_torch> $<TARGET_OBJECTS:tests>)
 
-  add_executable(lts_self_play lts_self_play.cc ${OPEN_SPIEL_OBJECTS}
+  add_executable(lts_run lts_run.cc ${OPEN_SPIEL_OBJECTS}
           $<TARGET_OBJECTS:alpha_zero_torch> $<TARGET_OBJECTS:tests>)
 
   target_link_libraries (alpha_zero_torch ${TORCH_LIBRARIES})
@@ -72,7 +74,7 @@ if (OPEN_SPIEL_BUILD_WITH_LIBTORCH)
   target_link_libraries (id_ab_negamax ${TORCH_LIBRARIES})
   target_link_libraries (two_lts ${TORCH_LIBRARIES})
   target_link_libraries (evaluate ${TORCH_LIBRARIES})
-  target_link_libraries (play ${TORCH_LIBRARIES})
+  # target_link_libraries (play ${TORCH_LIBRARIES})
   target_link_libraries (test_bf2lts ${TORCH_LIBRARIES})
-  target_link_libraries (lts_self_play ${TORCH_LIBRARIES})
+  target_link_libraries (lts_run ${TORCH_LIBRARIES})
 endif ()

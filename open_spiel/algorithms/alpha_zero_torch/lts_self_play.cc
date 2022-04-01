@@ -62,7 +62,7 @@ namespace open_spiel::algorithms::torch_az {
         int64_t total_trajectories;
     };
 
-    StartInfo StartInfoFromLearnerJson(const std::string &path) {
+    StartInfo StartInfoFromJson(const std::string &path) {
         StartInfo start_info;
         file::File learner_file(path + "/learner.jsonl", "r");
         std::vector<std::string> learner_lines = absl::StrSplit(
@@ -106,23 +106,34 @@ namespace open_spiel::algorithms::torch_az {
 
     Trajectory PlayGame(Logger *logger, int game_num, const open_spiel::Game &game,
                         std::vector<std::unique_ptr<BF2LTSBot>> *bots,
-                        std::mt19937 *rng, double temperature, int temperature_drop,
-                        double cutoff_value, bool verbose = false) {
+                        std::mt19937 *rng, bool verbose = false) {
         std::unique_ptr<open_spiel::State> state = game.NewInitialState();
         std::vector<std::string> history;
         Trajectory trajectory;
 
+        std::cout << "Begin game." << std::endl;
+
         while (true) {
+            std::cout << "New turn." << std::endl;
             open_spiel::Player player = state->CurrentPlayer();
+            std::cout << state << std::endl;
             SearchNode * root = (*bots)[player]->BF2LTSearch(*state);
             open_spiel::ActionsAndProbs policy;
             policy.reserve(root->children.size());
-            for (const SearchNode * c: root->children) {
-                policy.emplace_back(c->action, c->minimax_val);
-            }
-            NormalizePolicy(&policy);
+
             open_spiel::Action action;
+            std::cout << "Selecting action." << std::endl;
             action = root->BestChild().action;
+
+            for (const SearchNode * c: root->children) {
+                if (c->action == action)
+                    policy.emplace_back(c->action, 1.0);
+                else
+                    policy.emplace_back(c->action, 0.0);
+            }
+//            NormalizePolicy(&policy);
+
+            std::cout << "Action chosen: " << action << std::endl;
 
             double root_value = root->minimax_val;
             trajectory.states.push_back(Trajectory::State{
@@ -131,33 +142,39 @@ namespace open_spiel::algorithms::torch_az {
             std::string action_str = state->ActionToString(player, action);
             history.push_back(action_str);
             state->ApplyAction(action);
+            std::cout << "Delete search tree." << std::endl;
+            (*bots)[player]->GarbageCollect(root);
             if (verbose) {
                 logger->Print("Player: %d, action: %s", player, action_str);
             }
             if (state->IsTerminal()) {
                 trajectory.returns = state->Returns();
                 break;
-            } else if (std::abs(root_value) > cutoff_value) {
-                trajectory.returns.resize(2);
-                trajectory.returns[player] = root_value;
-                trajectory.returns[1 - player] = -root_value;
-                break;
             }
+//            else if (std::abs(root_value) > cutoff_value) {
+//                trajectory.returns.resize(2);
+//                trajectory.returns[player] = root_value;
+//                trajectory.returns[1 - player] = -root_value;
+//                break;
+//            }
         }
 
         logger->Print("Game %d: Returns: %s; Actions: %s", game_num,
                       absl::StrJoin(trajectory.returns, " "),
                       absl::StrJoin(history, " "));
+        std::cout << "End game." << std::endl;
+
         return trajectory;
     }
 
     std::unique_ptr<BF2LTSBot> InitLTSBot(const open_spiel::Game &game,
-                                       std::shared_ptr<VPNetEvaluator> evaluator) {
-        return std::make_unique<BF2LTSBot>(game, std::move(evaluator), 16, 7335, true);
+                                          std::shared_ptr<VPNetEvaluator> evaluator,
+                                          const LTSConfig &config) {
+        return std::make_unique<BF2LTSBot>(game, std::move(evaluator), config.max_simulations, 7335, true);
     }
 
 // An actor thread runner that generates games and returns trajectories.
-    void actor(const open_spiel::Game &game, const AlphaZeroConfig &config, int num,
+    void actor(const open_spiel::Game &game, const LTSConfig &config, int num,
                ThreadedQueue<Trajectory> *trajectory_queue,
                std::shared_ptr<VPNetEvaluator> vp_eval, StopToken *stop) {
         std::unique_ptr<Logger> logger;
@@ -171,15 +188,14 @@ namespace open_spiel::algorithms::torch_az {
         std::vector<std::unique_ptr<BF2LTSBot>> bots;
         bots.reserve(2);
         for (int player = 0; player < 2; player++) {
-            bots.push_back(InitLTSBot(game, vp_eval));
+            bots.push_back(InitLTSBot(game, vp_eval, config));
         }
         for (int game_num = 1; !stop->StopRequested(); ++game_num) {
-            double cutoff =
-                    (dist(rng) < config.cutoff_probability ? config.cutoff_value
-                                                           : game.MaxUtility() + 1);
+//            double cutoff =
+//                    (dist(rng) < config.cutoff_probability ? config.cutoff_value
+//                                                           : game.MaxUtility() + 1);
             if (!trajectory_queue->Push(
-                    PlayGame(logger.get(), game_num, game, &bots, &rng,
-                             config.temperature, config.temperature_drop, cutoff),
+                    PlayGame(logger.get(), game_num, game, &bots, &rng),
                     absl::Seconds(10))) {
                 logger->Print("Failed to push a trajectory after 10 seconds.");
             }
@@ -273,12 +289,11 @@ namespace open_spiel::algorithms::torch_az {
 //        logger.Print("Got a quit.");
 //    }
 
-    void learner(const open_spiel::Game &game, const AlphaZeroConfig &config,
+    void learner(const open_spiel::Game &game, const LTSConfig &config,
                  DeviceManager *device_manager,
                  std::shared_ptr<VPNetEvaluator> eval,
                  ThreadedQueue<Trajectory> *trajectory_queue,
-                 EvalResults *eval_results, StopToken *stop,
-                 const StartInfo &start_info) {
+                 StopToken *stop, const StartInfo &start_info) {
         FileLogger logger(config.path, "learner", "a");
         DataLoggerJsonLines data_logger(
                 config.path, "learner", true, "a", start_info.start_time);
@@ -428,11 +443,11 @@ namespace open_spiel::algorithms::torch_az {
                     {"value_prediction",
                                            json::TransformToArray(value_predictions,
                                                                   [](auto v) { return v.ToJson(); })},
-                    {"eval",               json::Object({
-                                                                {"count",   eval_results->EvalCount()},
-                                                                {"results", json::CastToArray(
-                                                                        eval_results->AvgResults())},
-                                                        })},
+//                    {"eval",               json::Object({
+//                                                                {"count",   eval_results->EvalCount()},
+//                                                                {"results", json::CastToArray(
+//                                                                        eval_results->AvgResults())},
+//                                                        })},
                     {"batch_size",         eval->BatchSizeStats().ToJson()},
                     {"batch_size_hist",    eval->BatchSizeHistogram().ToJson()},
                     {"loss",               json::Object({
@@ -472,7 +487,7 @@ namespace open_spiel::algorithms::torch_az {
         }
     }
 
-    bool LTSSelfPlay(AlphaZeroConfig config, StopToken *stop, bool resuming) {
+    bool LTSSelfPlay(LTSConfig config, StopToken *stop, bool resuming) {
         std::shared_ptr<const open_spiel::Game> game =
                 open_spiel::LoadGame(config.game);
 
@@ -534,7 +549,7 @@ namespace open_spiel::algorithms::torch_az {
                 /*model_checkpoint_step=*/0,
                 /*total_trajectories=*/0};
         if (resuming) {
-            start_info = StartInfoFromLearnerJson(config.path);
+            start_info = StartInfoFromJson(config.path);
         }
 
         DeviceManager device_manager;
@@ -573,25 +588,22 @@ namespace open_spiel::algorithms::torch_az {
                 &device_manager, config.inference_batch_size, config.inference_threads,
                 config.inference_cache, (config.actors + config.evaluators) / 16);
 
-        ThreadedQueue<Trajectory> trajectory_queue(config.replay_buffer_size /
-                                                   config.replay_buffer_reuse);
+        ThreadedQueue<Trajectory> trajectory_queue(config.replay_buffer_size / config.replay_buffer_reuse);
 
-        EvalResults eval_results(config.eval_levels, config.evaluation_window);
+//        EvalResults eval_results(config.eval_levels, config.evaluation_window);
 
         std::vector<Thread> actors;
         actors.reserve(config.actors);
         for (int i = 0; i < config.actors; ++i) {
-            actors.emplace_back(
-                    [&, i]() { actor(*game, config, i, &trajectory_queue, eval, stop); });
+            actors.emplace_back([&, i]() { actor(*game, config, i, &trajectory_queue, eval, stop); });
         }
-        std::vector<Thread> evaluators;
+//        std::vector<Thread> evaluators;
 //        evaluators.reserve(config.evaluators);
 //        for (int i = 0; i < config.evaluators; ++i) {
 //            evaluators.emplace_back(
 //                    [&, i]() { evaluator(*game, config, i, &eval_results, eval, stop); });
 //        }
-        learner(*game, config, &device_manager, eval, &trajectory_queue,
-                &eval_results, stop, start_info);
+        learner(*game, config, &device_manager, eval, &trajectory_queue, stop, start_info);
 
         if (!stop->StopRequested()) {
             stop->Stop();
@@ -605,12 +617,11 @@ namespace open_spiel::algorithms::torch_az {
         for (auto &t: actors) {
             t.join();
         }
-        for (auto &t: evaluators) {
-            t.join();
-        }
+//        for (auto &t: evaluators) {
+//            t.join();
+//        }
         std::cout << "Exiting cleanly." << std::endl;
         return true;
     }
 
 }  // namespace torch_az
-

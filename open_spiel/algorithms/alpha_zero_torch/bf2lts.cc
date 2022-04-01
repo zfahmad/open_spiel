@@ -10,6 +10,7 @@
 #include <memory>
 #include <random>
 #include <vector>
+#include <cstdlib>
 
 #include "open_spiel/abseil-cpp/absl/algorithm/container.h"
 #include "open_spiel/abseil-cpp/absl/random/distributions.h"
@@ -50,11 +51,14 @@ namespace open_spiel::algorithms::torch_az {
     }
 
     SearchNode& SearchNode::BestChild() {
+        std::cout << "Beginning best child procedure." << std::endl;
         std::vector<SearchNode *> best_children, best_child;
         std::vector<SearchNode *>::iterator child;
         float max_val = -std::numeric_limits<float>::infinity();
 
-        for (child = children.begin(); child < children.end(); child++) {
+        std::cout << "Iterating over children." << std::endl;
+
+        for (child = this->children.begin(); child < this->children.end(); child++) {
             if ((*child)->minimax_val > max_val) {
                 best_children.clear();
                 best_children.push_back((*child));
@@ -67,6 +71,10 @@ namespace open_spiel::algorithms::torch_az {
         std::sample(best_children.begin(), best_children.end(),
                     std::back_inserter(best_child), 1,
                     std::mt19937{std::random_device{}()});
+
+//        std::cout << this->state << std::endl;
+        std::cout << "Candidates size: " << best_children.size() << std::endl;
+        std::cout << "Found best: " << best_child.front()->action << std::endl;
 
         return *best_child.front();
     }
@@ -88,8 +96,10 @@ namespace open_spiel::algorithms::torch_az {
     }
 
     std::vector<SearchNode *> BF2LTSBot::GenerateChildren(SearchNode &parent_node) {
+//        std::cout << parent_node.state << std::endl;
         ActionsAndProbs legal_actions = evaluator_->Prior(*parent_node.state);
         parent_node.prediction_val = evaluator_->Evaluate(*parent_node.state)[parent_node.player];
+//        std::cout << parent_node.prediction_val << std::endl;
         int num_actions = legal_actions.size();
         std::vector<SearchNode *> generated_children;
 
@@ -115,14 +125,16 @@ namespace open_spiel::algorithms::torch_az {
     }
 
     void BF2LTSBot::BuildSearchTree(SearchNode *root_node) {
-
+        std::priority_queue<SearchNode*, std::vector<SearchNode*>, MyComparator> pq;
         int iterations = 0;
         pq.emplace(root_node);
-        while (!pq.empty() && iterations < max_simulations_) {
+        int max_iterations = std::max(rand() % max_simulations_, 2);
+        while (!pq.empty() && iterations < max_iterations) {
             // Pop a node from the priority queue to add to tree
 
             auto node = pq.top();
             pq.pop();
+//            std::cout << node->state << std::endl;
 
             // Check if node is terminal state. Generate children of node if it is not
             // and place children into queue.
@@ -130,7 +142,7 @@ namespace open_spiel::algorithms::torch_az {
             PrintNode(*node);
 
             if (node->state->IsTerminal()) {
-                node->minimax_val = node->state->Returns()[node->player];
+                node->minimax_val = -1;//node->state->Returns()[node->player];
                 node->terminal = true;
             } else {
                 auto generated_children = GenerateChildren(*node);
@@ -144,6 +156,8 @@ namespace open_spiel::algorithms::torch_az {
 
             iterations++;
         }
+        std::cout << "Built for " << iterations << " iterations." << std::endl;
+        std::cout << "Root has " << root_node->children.size() << " children." << std::endl;
     }
 
     double BF2LTSBot::MinimaxSearch(SearchNode *root_node) {
@@ -191,19 +205,29 @@ namespace open_spiel::algorithms::torch_az {
     }
 
     void BF2LTSBot::GarbageCollect(SearchNode *node) {
-        if (node->children.empty()) {
-            return;
-        }
         for (SearchNode *child: node->children) {
             GarbageCollect(child);
-            delete child;
         }
+        delete node;
+        // if (node->children.empty()) {
+        //     return;
+        // }
+        // for (SearchNode* child : node->children) {
+        //     GarbageCollect(child);
+        // }
+        //     nodes_ -= node->children.capacity();
+        //     node->children.clear();
+        //     node->children.shrink_to_fit();  // release the memory
     }
 
     SearchNode * BF2LTSBot::BF2LTSearch(const State& state) {
+        std::cout << "Begin search with " << max_simulations_ << " iterations." << std::endl;
         auto root_node = CreateSearchNode(state);
+        std::cout << "Building tree." << std::endl;
         BuildSearchTree(root_node);
+        std::cout << "Running minimax." << std::endl;
         MinimaxSearch(root_node);
+        std::cout << "End search." << std::endl;
         return root_node;
     }
 
