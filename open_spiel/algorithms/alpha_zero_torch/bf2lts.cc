@@ -128,7 +128,7 @@ namespace open_spiel::algorithms::torch_az {
         std::priority_queue<SearchNode*, std::vector<SearchNode*>, MyComparator> pq;
         int iterations = 0;
         pq.emplace(root_node);
-        int max_iterations = std::max(rand() % max_simulations_, 2);
+        int max_iterations = rand() % (max_simulations_ - 64) + 64;
         while (!pq.empty() && iterations < max_iterations) {
             // Pop a node from the priority queue to add to tree
 

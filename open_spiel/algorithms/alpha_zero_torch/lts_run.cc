@@ -28,21 +28,21 @@ ABSL_FLAG(std::string, graph_def, "",
            "from a checkpoint. If this is empty it'll create one."));
 ABSL_FLAG(std::string, nn_model, "resnet",
           "Model torso type, currently only resnet is available.");
-ABSL_FLAG(int, nn_width, 64, "Width of the model, passed to export_model.py.");
-ABSL_FLAG(int, nn_depth, 4, "Depth of the model, passed to export_model.py.");
+ABSL_FLAG(int, nn_width, 128, "Width of the model, passed to export_model.py.");
+ABSL_FLAG(int, nn_depth, 5, "Depth of the model, passed to export_model.py.");
 ABSL_FLAG(double, learning_rate, 0.0001, "Learning rate.");
 ABSL_FLAG(double, weight_decay, 0.0001, "Weight decay.");
 ABSL_FLAG(int, replay_buffer_size, 10000,
           "How many states to store in the replay buffer.");
-ABSL_FLAG(double, replay_buffer_reuse, 1,
+ABSL_FLAG(double, replay_buffer_reuse, 3,
           "How many times to reuse each state in the replay buffer.");
-ABSL_FLAG(int, checkpoint_freq, 25, "Save a checkpoint every N steps.");
-ABSL_FLAG(int, max_simulations, 128, "How many simulations to run.");
+ABSL_FLAG(int, checkpoint_freq, 250, "Save a checkpoint every N steps.");
+ABSL_FLAG(int, max_simulations, 256, "How many simulations to run.");
 ABSL_FLAG(int, train_batch_size, 100,
           "How many states to learn from per batch.");
 ABSL_FLAG(int, inference_batch_size, 32,
           "How many threads to wait for for inference.");
-ABSL_FLAG(int, inference_threads, 0, "How many threads to run inference.");
+ABSL_FLAG(int, inference_threads, 1, "How many threads to run inference.");
 ABSL_FLAG(int, inference_cache, 1 << 18,
           "Whether to cache the results from inference.");
 ABSL_FLAG(std::string, devices, "/cpu:0",
@@ -56,9 +56,9 @@ ABSL_FLAG(bool, explicit_learning, false,
           "not take on inference requests) which can only be used when "
           "multiple devices are available).");
 ABSL_FLAG(bool, verbose, true, "Show the MCTS stats of possible moves.");
-ABSL_FLAG(int, actors, 3, "How many actors to run.");
+ABSL_FLAG(int, actors, 20, "How many actors to run.");
 ABSL_FLAG(int, evaluators, 0, "How many evaluators to run.");
-ABSL_FLAG(int, max_steps, 250, "How many learn steps to run.");
+ABSL_FLAG(int, max_steps, 1500, "How many learn steps to run.");
 ABSL_FLAG(int, evaluation_window, 0,
           "Number of games to average results over.");
 
